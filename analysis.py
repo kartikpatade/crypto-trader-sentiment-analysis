@@ -1,8 +1,3 @@
-# ============================================================
-# Primetrade.ai – Round 0 Assignment
-# Trader Performance vs Market Sentiment (Fear/Greed)
-# ============================================================
-
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -16,70 +11,52 @@ warnings.filterwarnings('ignore')
 sns.set_theme(style='whitegrid', palette='muted')
 plt.rcParams.update({'figure.dpi': 130, 'font.family': 'DejaVu Sans'})
 
-CHARTS = '/home/claude/primetrade_assignment/charts/'
+CHARTS = 'charts/'
 
-# ============================================================
-# PART A – DATA PREPARATION
-# ============================================================
-
-# --- Load ---
-fg_raw  = pd.read_csv('/mnt/user-data/uploads/fear_greed_index.csv')
-hist_raw = pd.read_csv('/mnt/user-data/uploads/historical_data.csv')
+# Load data
+fg_raw  = pd.read_csv('fear_greed_index.csv')
+hist_raw = pd.read_csv('historical_data.csv')
 
 print("=" * 55)
-print("PART A — DATA PREPARATION")
+print("PART A - DATA PREPARATION")
 print("=" * 55)
-print(f"\nFear/Greed  : {fg_raw.shape[0]:,} rows × {fg_raw.shape[1]} cols")
-print(f"Trader Data : {hist_raw.shape[0]:,} rows × {hist_raw.shape[1]} cols")
+print(f"\nFear/Greed  : {fg_raw.shape[0]:,} rows x {fg_raw.shape[1]} cols")
+print(f"Trader Data : {hist_raw.shape[0]:,} rows x {hist_raw.shape[1]} cols")
 
-# --- Missing / Duplicates ---
 print("\n[Fear/Greed] Missing values:\n", fg_raw.isnull().sum().to_string())
 print(f"\n[Fear/Greed] Duplicate rows: {fg_raw.duplicated().sum()}")
 print("\n[Trader Data] Missing values:\n", hist_raw.isnull().sum().to_string())
 print(f"\n[Trader Data] Duplicate rows: {hist_raw.duplicated().sum()}")
 
-# --- Parse dates ---
 fg = fg_raw.copy()
 fg['date'] = pd.to_datetime(fg['date'])
 
 hist = hist_raw.copy()
 hist['date'] = pd.to_datetime(hist['Timestamp IST'].str[:10], format='%d-%m-%Y')
 
-# Simplify sentiment into 2 broad buckets + keep 5-way classification
+# Map detailed sentiments to broad Fear/Neutral/Greed categories
 fg['sentiment'] = fg['classification'].map({
     'Extreme Fear': 'Fear', 'Fear': 'Fear',
     'Neutral': 'Neutral',
     'Greed': 'Greed', 'Extreme Greed': 'Greed'
 })
 
-# --- Merge ---
 trader_daily = hist.merge(fg[['date', 'classification', 'sentiment', 'value']],
                            on='date', how='inner')
 print(f"\nPost-merge rows: {trader_daily.shape[0]:,}")
-print(f"Date range in merged data: {trader_daily['date'].min().date()} → {trader_daily['date'].max().date()}")
+print(f"Date range in merged data: {trader_daily['date'].min().date()} to {trader_daily['date'].max().date()}")
 
-# ============================================================
-# PART A – KEY METRICS
-# ============================================================
-
-# Identify closing trades (have non-zero PnL)
+# Extract closing trades and compute key metrics
 closes = trader_daily[trader_daily['Closed PnL'] != 0].copy()
-
-# Win flag
 closes['win'] = closes['Closed PnL'] > 0
-
-# Long/Short flag from Direction
 closes['is_long'] = closes['Direction'].str.contains('Long', na=False)
-
-# Size USD as position size proxy
-# Leverage proxy: Size USD / |Start Position| where Start Position != 0
 closes['lev_proxy'] = np.where(
     closes['Start Position'].abs() > 10,
     closes['Size USD'] / closes['Start Position'].abs(),
     np.nan
 )
 
-# ---- Daily aggregate per trader ----
+# Daily metrics per trader
 daily_trader = closes.groupby(['date', 'Account', 'sentiment', 'classification', 'value']).agg(
     daily_pnl     = ('Closed PnL', 'sum'),
     n_trades      = ('Closed PnL', 'count'),
@@ -89,7 +66,7 @@ daily_trader = closes.groupby(['date', 'Account', 'sentiment', 'classification',
     long_ratio    = ('is_long', 'mean'),
 ).reset_index()
 
-# ---- Daily market-wide ----
+# Daily market-wide metrics
 daily_mkt = closes.groupby(['date', 'sentiment', 'classification', 'value']).agg(
     total_pnl     = ('Closed PnL', 'sum'),
     n_trades      = ('Closed PnL', 'count'),
@@ -105,15 +82,7 @@ print(f"Total closing trades analysed: {len(closes):,}")
 print("\nSentiment distribution in merged data:")
 print(daily_mkt['sentiment'].value_counts().to_string())
 
-# ============================================================
-# PART B – ANALYSIS
-# ============================================================
-
-print("\n" + "=" * 55)
-print("PART B — ANALYSIS")
-print("=" * 55)
-
-# ── B1: Performance by Sentiment ────────────────────────────
+# B1: Performance by Sentiment
 sent_perf = daily_mkt.groupby('sentiment').agg(
     avg_daily_pnl = ('total_pnl', 'mean'),
     median_daily_pnl = ('total_pnl', 'median'),
@@ -122,11 +91,10 @@ sent_perf = daily_mkt.groupby('sentiment').agg(
 ).round(2)
 print("\n[B1] Performance by Sentiment:\n", sent_perf.to_string())
 
-# Drawdown proxy = worst single-day total PnL per sentiment
 drawdown = daily_mkt.groupby('sentiment')['total_pnl'].min().rename('worst_day_pnl')
 print("\nWorst day PnL by sentiment:\n", drawdown.to_string())
 
-# ── B2: Trader Behaviour by Sentiment ───────────────────────
+# B2: Trader Behaviour by Sentiment
 bhv = daily_trader.groupby('sentiment').agg(
     avg_trades    = ('n_trades', 'mean'),
     avg_lev       = ('avg_lev', 'mean'),
@@ -135,8 +103,7 @@ bhv = daily_trader.groupby('sentiment').agg(
 ).round(3)
 print("\n[B2] Trader behaviour by sentiment:\n", bhv.to_string())
 
-# ── B3: Trader Segmentation ─────────────────────────────────
-# Aggregate per trader overall
+# B3: Trader Segmentation
 trader_overall = closes.groupby('Account').agg(
     total_pnl    = ('Closed PnL', 'sum'),
     total_trades = ('Closed PnL', 'count'),
@@ -145,21 +112,17 @@ trader_overall = closes.groupby('Account').agg(
     avg_size     = ('Size USD', 'mean'),
 ).reset_index()
 
-# Segment 1: Leverage (median split)
 lev_med = trader_overall['avg_lev'].median()
 trader_overall['lev_seg'] = np.where(trader_overall['avg_lev'] >= lev_med, 'High Leverage', 'Low Leverage')
 
-# Segment 2: Trade frequency (median split)
 freq_med = trader_overall['total_trades'].median()
 trader_overall['freq_seg'] = np.where(trader_overall['total_trades'] >= freq_med, 'Frequent', 'Infrequent')
 
-# Segment 3: Consistency (winners = positive total PnL)
 trader_overall['perf_seg'] = np.where(trader_overall['total_pnl'] > 0, 'Net Winner', 'Net Loser')
 
 print("\n[B3] Trader segments summary:")
 print(trader_overall[['lev_seg','freq_seg','perf_seg']].apply(pd.Series.value_counts))
 
-# ── Segment × Sentiment cross analysis ──────────────────────
 merged_seg = daily_trader.merge(
     trader_overall[['Account','lev_seg','freq_seg','perf_seg']], on='Account')
 
@@ -168,24 +131,21 @@ seg_sent = merged_seg.groupby(['perf_seg','sentiment']).agg(
     avg_win_rate = ('win_rate', 'mean'),
     avg_trades   = ('n_trades', 'mean'),
 ).round(3)
-print("\n[B3] Net Winner/Loser × Sentiment:\n", seg_sent.to_string())
+print("\n[B3] Net Winner/Loser vs Sentiment:\n", seg_sent.to_string())
 
 lev_sent = merged_seg.groupby(['lev_seg','sentiment']).agg(
     avg_pnl      = ('daily_pnl', 'mean'),
     avg_win_rate = ('win_rate', 'mean'),
     avg_lev      = ('avg_lev', 'mean'),
 ).round(3)
-print("\n[B3] Leverage Segment × Sentiment:\n", lev_sent.to_string())
+print("\n[B3] Leverage Segment vs Sentiment:\n", lev_sent.to_string())
 
-# ============================================================
-# CHARTS
-# ============================================================
-
+# Chart configuration
 SENT_ORDER = ['Fear', 'Neutral', 'Greed']
 SENT_COLORS = {'Fear': '#e74c3c', 'Neutral': '#f39c12', 'Greed': '#27ae60'}
 palette = [SENT_COLORS[s] for s in SENT_ORDER]
 
-# ── Chart 1: Avg Daily PnL by Sentiment ─────────────────────
+# Chart 1: PnL and Win Rate by Sentiment
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
 sent_perf_ordered = sent_perf.reindex(SENT_ORDER)
@@ -211,7 +171,7 @@ plt.savefig(CHARTS + 'chart1_pnl_winrate_sentiment.png', bbox_inches='tight')
 plt.close()
 print("\nSaved chart 1")
 
-# ── Chart 2: Behaviour metrics by Sentiment ─────────────────
+# Chart 2: Behaviour metrics by Sentiment
 fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 bhv_ordered = bhv.reindex(SENT_ORDER)
 
@@ -233,7 +193,7 @@ plt.savefig(CHARTS + 'chart2_behaviour_sentiment.png', bbox_inches='tight')
 plt.close()
 print("Saved chart 2")
 
-# ── Chart 3: PnL Distribution Fear vs Greed (box plot) ──────
+# Chart 3: PnL Distribution Fear vs Greed
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
 fg_subset = daily_trader[daily_trader['sentiment'].isin(['Fear', 'Greed'])]
@@ -251,7 +211,7 @@ bp = axes[0].boxplot(
 bp['boxes'][0].set_facecolor('#e74c3c')
 bp['boxes'][1].set_facecolor('#27ae60')
 axes[0].set_title('Daily PnL Distribution: Fear vs Greed', fontsize=12, fontweight='bold')
-axes[0].set_ylabel('Daily PnL per Trader (USD, clipped at ±5k)')
+axes[0].set_ylabel('Daily PnL per Trader (USD, clipped +/- 5k)')
 axes[0].axhline(0, color='black', linestyle='--', linewidth=0.8)
 
 # Histogram overlay
@@ -268,14 +228,14 @@ plt.savefig(CHARTS + 'chart3_pnl_distribution.png', bbox_inches='tight')
 plt.close()
 print("Saved chart 3")
 
-# ── Chart 4: Trader Segments – Heatmap PnL by Segment × Sent
+# Chart 4: Segment vs Sentiment heatmaps
 fig, axes = plt.subplots(1, 2, figsize=(13, 4))
 
 # Net Winner/Loser heatmap
 pivot1 = merged_seg.groupby(['perf_seg','sentiment'])['daily_pnl'].mean().unstack()[SENT_ORDER]
 sns.heatmap(pivot1, annot=True, fmt='.0f', cmap='RdYlGn', center=0, ax=axes[0],
             linewidths=0.5, cbar_kws={'label': 'Avg Daily PnL (USD)'})
-axes[0].set_title('Avg Daily PnL: Winner/Loser × Sentiment', fontsize=11, fontweight='bold')
+axes[0].set_title('Avg Daily PnL: Winner/Loser vs Sentiment', fontsize=11, fontweight='bold')
 axes[0].set_xlabel('')
 axes[0].set_ylabel('')
 
@@ -283,7 +243,7 @@ axes[0].set_ylabel('')
 pivot2 = merged_seg.groupby(['lev_seg','sentiment'])['daily_pnl'].mean().unstack()[SENT_ORDER]
 sns.heatmap(pivot2, annot=True, fmt='.0f', cmap='RdYlGn', center=0, ax=axes[1],
             linewidths=0.5, cbar_kws={'label': 'Avg Daily PnL (USD)'})
-axes[1].set_title('Avg Daily PnL: Leverage Segment × Sentiment', fontsize=11, fontweight='bold')
+axes[1].set_title('Avg Daily PnL: Leverage Segment vs Sentiment', fontsize=11, fontweight='bold')
 axes[1].set_xlabel('')
 axes[1].set_ylabel('')
 
@@ -292,7 +252,7 @@ plt.savefig(CHARTS + 'chart4_segment_heatmap.png', bbox_inches='tight')
 plt.close()
 print("Saved chart 4")
 
-# ── Chart 5: Cumulative PnL over time colored by sentiment ──
+# Chart 5: Cumulative PnL over time
 daily_cumulative = daily_mkt.sort_values('date').copy()
 daily_cumulative['cum_pnl'] = daily_cumulative['total_pnl'].cumsum()
 
@@ -314,7 +274,7 @@ plt.savefig(CHARTS + 'chart5_cumulative_pnl.png', bbox_inches='tight')
 plt.close()
 print("Saved chart 5")
 
-# ── Chart 6: Leverage distribution by sentiment (violin) ────
+# Chart 6: Leverage distribution by sentiment
 fig, ax = plt.subplots(figsize=(10, 5))
 lev_data = merged_seg[merged_seg['avg_lev'].notna() & (merged_seg['avg_lev'] < 50)]
 sent_order_plot = [s for s in SENT_ORDER if s in lev_data['sentiment'].unique()]
@@ -328,7 +288,7 @@ plt.savefig(CHARTS + 'chart6_leverage_violin.png', bbox_inches='tight')
 plt.close()
 print("Saved chart 6")
 
-# ── Chart 7: Win Rate by Segment × Sentiment (grouped bar) ──
+# Chart 7: Win Rate by Segment vs Sentiment
 fig, ax = plt.subplots(figsize=(11, 5))
 seg_wr = merged_seg.groupby(['perf_seg','sentiment'])['win_rate'].mean().reset_index()
 seg_wr = seg_wr[seg_wr['sentiment'].isin(SENT_ORDER)]
@@ -344,7 +304,7 @@ for i, sent in enumerate(SENT_ORDER):
 ax.set_xticks(x + width)
 ax.set_xticklabels(x_labels)
 ax.set_ylabel('Win Rate (%)')
-ax.set_title('Win Rate by Trader Segment × Sentiment', fontsize=13, fontweight='bold')
+ax.set_title('Win Rate by Trader Segment vs Sentiment', fontsize=13, fontweight='bold')
 ax.legend(title='Sentiment')
 ax.set_ylim(0, 80)
 plt.tight_layout()
@@ -352,19 +312,12 @@ plt.savefig(CHARTS + 'chart7_winrate_segments.png', bbox_inches='tight')
 plt.close()
 print("Saved chart 7")
 
-print("\n✅ All charts saved.")
-
-# ============================================================
-# SUMMARY STATS FOR WRITE-UP
-# ============================================================
-print("\n" + "=" * 55)
-print("SUMMARY STATISTICS FOR WRITE-UP")
-print("=" * 55)
+print("\n[SUCCESS] All charts saved.")
 print("\nPerformance by sentiment:")
 print(sent_perf.reindex(SENT_ORDER).to_string())
 print("\nBehaviour by sentiment:")
 print(bhv.reindex(SENT_ORDER).to_string())
-print("\nLeverage × Sentiment:")
+print("\nLeverage vs Sentiment:")
 print(lev_sent.to_string())
-print("\nWinner/Loser × Sentiment:")
+print("\nWinner/Loser vs Sentiment:")
 print(seg_sent.to_string())
