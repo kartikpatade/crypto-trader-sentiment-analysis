@@ -1,10 +1,14 @@
 # Crypto Trader Sentiment Analysis
 
+> Traders tend to generate higher returns during Fear-driven markets, suggesting volatility creates opportunity rather than just risk.
+
+---
+
 ## Overview
 
-This project looks at how market sentiment (Fear vs Greed) affects trader performance and behavior.
+This project explores how market sentiment (Fear vs Greed) affects trader performance and behavior.
 
-The analysis uses historical trading data along with the Fear & Greed Index to see how things like PnL, trading activity, and leverage change under different market conditions.
+Using historical trading data along with the Fear & Greed Index, the analysis looks at patterns in PnL, trading activity, and leverage under different market conditions.
 
 The dataset covers May 2023 to May 2025, with over 100,000 trades across 32 traders.
 
@@ -14,68 +18,74 @@ The dataset covers May 2023 to May 2025, with over 100,000 trades across 32 trad
 
 Install dependencies:
 
+```
 pip install pandas numpy matplotlib seaborn scikit-learn jupyter
+```
 
 Run the notebook:
 
+```
 jupyter notebook trader_sentiment_analysis.ipynb
+```
 
 Or run the script:
 
+```
 python analysis.py
+```
 
 ---
 
 ## Methodology
 
-First, both datasets were loaded and checked. There were no missing values or duplicates.
+Both datasets were loaded and checked. There were no missing values or duplicates.
 
-Dates from the trading data were aligned with the Fear & Greed Index so that each day could be assigned a sentiment.
+Dates from the trading data were aligned with the Fear & Greed Index so each day could be assigned a sentiment.
 
-The sentiment categories were simplified into three groups:
-- Fear (including Extreme Fear)
-- Neutral
-- Greed (including Extreme Greed)
+The sentiment values were grouped into three categories:
 
-After that, key metrics were calculated such as daily PnL, win rate, number of trades, position size, and a simple leverage proxy.
+- Fear (including Extreme Fear)  
+- Neutral  
+- Greed (including Extreme Greed)  
 
-Traders were also grouped into segments like net winners and net losers to compare behavior.
+Key metrics were then calculated, including daily PnL, win rate, number of trades, position size, and a simple leverage proxy.
+
+Traders were also segmented into groups like net winners and net losers to compare behavior.
 
 ---
 
 ## Key Insights
 
-Fear days show much higher average PnL compared to Greed days (around 2.6× higher). This suggests that traders perform better when the market is more volatile.
-
-Trading activity also increases during Fear periods. Traders place more trades, use higher leverage, and take larger positions.
-
-One important pattern is that net losing traders perform much worse during Greed periods. They tend to lose heavily in those conditions, while they do relatively better during Fear.
-
-On the other hand, net winning traders remain consistently profitable across all sentiment types.
+- Fear days show much higher average PnL compared to Greed days (around 2.6× higher)  
+- Trading activity increases during Fear periods, with more trades, higher leverage, and larger position sizes  
+- Net losing traders perform significantly worse during Greed periods  
+- Net winning traders remain consistently profitable across different sentiment conditions  
 
 ---
 
 ## Strategy Takeaways
 
-Fear periods seem to offer better opportunities, but they also come with higher risk. Traders tend to be more active and aggressive during these times.
+- Fear periods seem to offer better opportunities, but also involve higher risk  
+- Greed periods require more discipline, as overtrading is linked with higher losses  
 
-Greed periods require more discipline. Overtrading during these conditions is linked with higher losses, especially for weaker traders.
+Simple takeaway:
 
-A simple takeaway is:
-- Be more active and selective during Fear
-- Be more cautious during Greed
+- Be more active during Fear  
+- Be more cautious during Greed  
+
+---
+
+## Sample Output
+
+![PnL vs Sentiment](charts/chart1_pnl_winrate_sentiment.png)
 
 ---
 
 ## Outputs
 
-The project generates multiple charts showing:
-- PnL and win rate across sentiment
-- Trading behavior differences
-- Distribution of returns
-- Segment-wise performance
+The project generates multiple charts showing performance and behavior across sentiment conditions.
 
-All charts are saved in the charts/ folder.
+All charts are saved in the `charts/` folder and can be reproduced by running the analysis script.
 
 ---
 
